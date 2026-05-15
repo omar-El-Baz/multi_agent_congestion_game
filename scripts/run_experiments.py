@@ -13,7 +13,7 @@ def setup_braess_network():
     net = NetworkGraph()
     net.add_edge('S', 'A', a=0.01, b=0.0)
     net.add_edge('S', 'B', a=0.0, b=45.0)
-    net.add_edge('A', 'B', a=0.0, b=0.0)  # The problematic resource
+    net.add_edge('A', 'B', a=0.0, b=0.0)  
     net.add_edge('A', 'D', a=0.0, b=45.0)
     net.add_edge('B', 'D', a=0.01, b=0.0)
     return net
@@ -28,6 +28,16 @@ def setup_standard_network():
     net.add_edge('B', 'D', a=0.01, b=0.0)
     return net
 
+def setup_degraded_network():
+    """Network with steeper cost functions (Changing Cost Functions experiment)"""
+    net = NetworkGraph()
+    net.add_edge('S', 'A', a=0.05, b=0.0)  # Increased from 0.01 to 0.05
+    net.add_edge('S', 'B', a=0.0, b=45.0)
+    net.add_edge('A', 'B', a=0.0, b=0.0)
+    net.add_edge('A', 'D', a=0.0, b=45.0)
+    net.add_edge('B', 'D', a=0.05, b=0.0)  # Increased from 0.01 to 0.05
+    return net
+
 def run_all_experiments():
     agent_counts = [500, 1000, 2000, 3000, 4000]
     
@@ -35,6 +45,7 @@ def run_all_experiments():
     total_costs_braess_nash = []
     total_costs_braess_opt = []
     total_costs_standard_nash = []
+    total_costs_degraded_nash = [] # NEW: Store degraded network data
     convergence_data_4000 = []
 
     print("Running comprehensive experiments...")
@@ -47,7 +58,7 @@ def run_all_experiments():
         history = sim_braess.run(max_epochs=15)
         
         if count == 4000:
-            convergence_data_4000 = history # Save history for the convergence plot
+            convergence_data_4000 = history 
             
         braess_total = sum(edge.current_load * edge.get_cost() for edge in net_braess.edges.values())
         total_costs_braess_nash.append(braess_total)
@@ -66,10 +77,17 @@ def run_all_experiments():
         standard_total = sum(edge.current_load * edge.get_cost() for edge in net_standard.edges.values())
         total_costs_standard_nash.append(standard_total)
 
-    return agent_counts, total_costs_braess_nash, total_costs_braess_opt, total_costs_standard_nash, convergence_data_4000
+        # 4. Degraded Network (Changing Cost Functions - Selfish)
+        net_degraded = setup_degraded_network()
+        sim_degraded = CongestionSimulation(net_degraded, [Agent(i, 'S', 'D') for i in range(count)])
+        sim_degraded.run(max_epochs=15)
+        degraded_total = sum(edge.current_load * edge.get_cost() for edge in net_degraded.edges.values())
+        total_costs_degraded_nash.append(degraded_total)
 
-def generate_plots(counts, braess_nash, braess_opt, standard_nash, convergence_history):
-    # Plot 1: Total Cost vs Players (Fixes the Average Latency deviation)
+    return agent_counts, total_costs_braess_nash, total_costs_braess_opt, total_costs_standard_nash, total_costs_degraded_nash, convergence_data_4000
+
+def generate_plots(counts, braess_nash, braess_opt, standard_nash, degraded_nash, convergence_history):
+    # Plot 1: Total Cost vs Players
     plt.figure(figsize=(10, 6))
     plt.plot(counts, braess_nash, label='Nash (With Cross-link)', marker='o', color='#e74c3c')
     plt.plot(counts, braess_opt, label='Social Optimum (With Cross-link)', marker='s', color='#2ecc71')
@@ -102,7 +120,18 @@ def generate_plots(counts, braess_nash, braess_opt, standard_nash, convergence_h
     plt.tight_layout()
     plt.savefig('docs/strategy_convergence.png', dpi=300)
 
-    print("\nAll plots successfully saved to docs/ directory!")
+    # Plot 4: Changing Cost Functions (NEW)
+    plt.figure(figsize=(10, 6))
+    plt.plot(counts, braess_nash, label='Standard Cost (a=0.01)', marker='o', color='#e74c3c')
+    plt.plot(counts, degraded_nash, label='Degraded Cost (a=0.05)', marker='D', color='#e67e22')
+    plt.title("Impact of Changing Cost Functions on Selfish Routing", fontsize=14)
+    plt.xlabel("Number of Players", fontsize=12)
+    plt.ylabel("Total System Cost", fontsize=12)
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig('docs/cost_function_impact.png', dpi=300)
+
+    print("\nAll 4 plots successfully saved to docs/ directory!")
 
 if __name__ == "__main__":
     results = run_all_experiments()
