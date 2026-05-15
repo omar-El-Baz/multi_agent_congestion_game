@@ -9,8 +9,8 @@ class CongestionSimulation:
 
     def run(self, max_epochs=100):
         print(f"Starting simulation with {len(self.agents)} agents...")
+        convergence_history = []  # NEW: Track changes per epoch
         
-        # Initialize all agents on the first available path
         for agent in self.agents:
             agent.update_path(self.paths[0], self.network)
 
@@ -23,24 +23,24 @@ class CongestionSimulation:
 
                 for path in self.paths:
                     cost = agent.evaluate_path_cost(path, self.network)
-                    
-                    # Strict inequality (<) prevents infinite loops between identical-cost paths
                     if cost < min_cost:
                         min_cost = cost
                         best_path = path
 
-                # If the agent found a better path, switch to it
                 if best_path != agent.current_path:
                     agent.update_path(best_path, self.network)
                     strategies_changed += 1
 
             print(f"Epoch {epoch}: {strategies_changed} agents changed paths.")
+            convergence_history.append(strategies_changed) # NEW: Store the data
 
             if strategies_changed == 0:
                 print("\n--- Nash Equilibrium Reached! ---")
                 self.print_results()
                 break
-
+                
+        return convergence_history 
+    
     def print_results(self):
         print("Final Path Distribution:")
         path_counts = {tuple(path): 0 for path in self.paths}
